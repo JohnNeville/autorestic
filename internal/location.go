@@ -314,6 +314,11 @@ after:
 		commands = l.Hooks.Success
 	} else {
 		commands = l.Hooks.Failure
+		errMsgs := make([]string, len(errors))
+		for i, e := range errors {
+			errMsgs[i] = e.Error()
+		}
+		options.Envs["AUTORESTIC_FAILURE_REASON"] = strings.Join(errMsgs, "\n")
 	}
 	if err := l.ExecuteHooks(commands, options); err != nil {
 		errors = append(errors, err)
@@ -346,6 +351,7 @@ func (l Location) Forget(prune bool, dry bool) error {
 	}
 
 	if err := l.ExecuteHooks(l.ForgetHooks.Before, hookOptions); err != nil {
+		hookOptions.Envs["AUTORESTIC_FAILURE_REASON"] = err.Error()
 		if hookErr := l.ExecuteHooks(l.ForgetHooks.Failure, hookOptions); hookErr != nil {
 			colors.Error.Println(hookErr)
 		}
@@ -391,6 +397,7 @@ func (l Location) Forget(prune bool, dry bool) error {
 	}
 
 	if forgetErr != nil {
+		hookOptions.Envs["AUTORESTIC_FAILURE_REASON"] = forgetErr.Error()
 		if err := l.ExecuteHooks(l.ForgetHooks.Failure, hookOptions); err != nil {
 			colors.Error.Println(err)
 		}
