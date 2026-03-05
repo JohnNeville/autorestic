@@ -50,6 +50,7 @@ type Location struct {
 	Type         string               `mapstructure:"type,omitempty" yaml:"type,omitempty"`
 	To           []string             `mapstructure:"to,omitempty" yaml:"to,omitempty"`
 	Hooks        Hooks                `mapstructure:"hooks,omitempty" yaml:"hooks,omitempty"`
+	ForgetHooks  Hooks                `mapstructure:"forget-hooks,omitempty" yaml:"forget-hooks,omitempty"`
 	Cron         string               `mapstructure:"cron,omitempty" yaml:"cron,omitempty"`
 	Options      Options              `mapstructure:"options,omitempty" yaml:"options,omitempty"`
 	ForgetOption LocationForgetOption `mapstructure:"forget,omitempty" yaml:"forget,omitempty"`
@@ -335,6 +336,23 @@ after:
 func (l Location) Forget(prune bool, dry bool) error {
 	colors.PrimaryPrint("Forgetting for location \"%s\"", l.name)
 
+	cwd, _ := GetPathRelativeToConfig(".")
+	hookOptions := ExecuteOptions{
+		Command: "bash",
+		Dir:     cwd,
+		Envs: map[string]string{
+			"AUTORESTIC_LOCATION": l.name,
+		},
+	}
+
+	if err := l.ExecuteHooks(l.ForgetHooks.Before, hookOptions); err != nil {
+		if hookErr := l.ExecuteHooks(l.ForgetHooks.Failure, hookOptions); hookErr != nil {
+			colors.Error.Println(hookErr)
+		}
+		return err
+	}
+
+	var forgetErr error
 	backendsToForget := l.To
 	for _, copyBackends := range l.CopyOption {
 		backendsToForget = append(backendsToForget, copyBackends...)
@@ -345,7 +363,8 @@ func (l Location) Forget(prune bool, dry bool) error {
 		colors.Secondary.Printf("For backend \"%s\"\n", backend.name)
 		env, err := backend.getEnv()
 		if err != nil {
-			return nil
+			forgetErr = err
+			continue
 		}
 		options := ExecuteOptions{
 			Envs: env,
@@ -360,9 +379,28 @@ func (l Location) Forget(prune bool, dry bool) error {
 		cmd = append(cmd, combineAllOptions("forget", l, backend)...)
 		_, _, err = ExecuteResticCommand(options, cmd...)
 		if err != nil {
-			return err
+			forgetErr = err
 		}
 	}
+
+	if err := l.ExecuteHooks(l.ForgetHooks.After, hookOptions); err != nil {
+		colors.Error.Println(err)
+		if forgetErr == nil {
+			forgetErr = err
+		}
+	}
+
+	if forgetErr != nil {
+		if err := l.ExecuteHooks(l.ForgetHooks.Failure, hookOptions); err != nil {
+			colors.Error.Println(err)
+		}
+		return forgetErr
+	}
+
+	if err := l.ExecuteHooks(l.ForgetHooks.Success, hookOptions); err != nil {
+		return err
+	}
+
 	colors.Success.Println("Done")
 	return nil
 }
