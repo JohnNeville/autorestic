@@ -1,4 +1,4 @@
-module github.com/cupcakearmy/autorestic
+module github.com/JohnNeville/autorestic
 
 go 1.21
 

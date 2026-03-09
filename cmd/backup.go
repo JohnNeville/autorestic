@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cupcakearmy/autorestic/internal"
-	"github.com/cupcakearmy/autorestic/internal/colors"
-	"github.com/cupcakearmy/autorestic/internal/lock"
+	"github.com/JohnNeville/autorestic/internal"
+	"github.com/JohnNeville/autorestic/internal/colors"
+	"github.com/JohnNeville/autorestic/internal/lock"
 	"github.com/spf13/cobra"
 )
 

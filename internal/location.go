@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cupcakearmy/autorestic/internal/colors"
-	"github.com/cupcakearmy/autorestic/internal/flags"
-	"github.com/cupcakearmy/autorestic/internal/lock"
-	"github.com/cupcakearmy/autorestic/internal/metadata"
+	"github.com/JohnNeville/autorestic/internal/colors"
+	"github.com/JohnNeville/autorestic/internal/flags"
+	"github.com/JohnNeville/autorestic/internal/lock"
+	"github.com/JohnNeville/autorestic/internal/metadata"
 	"github.com/robfig/cron"
 )
 

@@ -13,9 +13,9 @@ import (
 	"strings"
 
 	"github.com/blang/semver/v4"
-	"github.com/cupcakearmy/autorestic/internal"
-	"github.com/cupcakearmy/autorestic/internal/colors"
-	"github.com/cupcakearmy/autorestic/internal/flags"
+	"github.com/JohnNeville/autorestic/internal"
+	"github.com/JohnNeville/autorestic/internal/colors"
+	"github.com/JohnNeville/autorestic/internal/flags"
 )
 
 const INSTALL_PATH = "/usr/local/bin"

@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"github.com/cupcakearmy/autorestic/internal"
-	"github.com/cupcakearmy/autorestic/internal/flags"
-	"github.com/cupcakearmy/autorestic/internal/lock"
+	"github.com/JohnNeville/autorestic/internal"
+	"github.com/JohnNeville/autorestic/internal/flags"
+	"github.com/JohnNeville/autorestic/internal/lock"
 	"github.com/spf13/cobra"
 )
 
