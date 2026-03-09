@@ -55,6 +55,7 @@ type Location struct {
 	Options      Options              `mapstructure:"options,omitempty" yaml:"options,omitempty"`
 	ForgetOption LocationForgetOption `mapstructure:"forget,omitempty" yaml:"forget,omitempty"`
 	CopyOption   LocationCopy         `mapstructure:"copy,omitempty" yaml:"copy,omitempty"`
+	Envs         map[string]string    `mapstructure:"envs,omitempty" yaml:"envs,omitempty"`
 }
 
 func GetLocation(name string) (Location, bool) {
@@ -179,12 +180,16 @@ func (l Location) Backup(cron bool, dry bool, specificBackend string) []error {
 		return errors
 	}
 	cwd, _ := GetPathRelativeToConfig(".")
+	// User-defined envs are applied first so system vars always take priority
+	envs := map[string]string{}
+	for k, v := range l.Envs {
+		envs[k] = v
+	}
+	envs["AUTORESTIC_LOCATION"] = l.name
 	options := ExecuteOptions{
 		Command: "bash",
 		Dir:     cwd,
-		Envs: map[string]string{
-			"AUTORESTIC_LOCATION": l.name,
-		},
+		Envs:    envs,
 	}
 
 	// Hooks before location validation
@@ -342,12 +347,16 @@ func (l Location) Forget(prune bool, dry bool) error {
 	colors.PrimaryPrint("Forgetting for location \"%s\"", l.name)
 
 	cwd, _ := GetPathRelativeToConfig(".")
+	// User-defined envs are applied first so system vars always take priority
+	hookEnvs := map[string]string{}
+	for k, v := range l.Envs {
+		hookEnvs[k] = v
+	}
+	hookEnvs["AUTORESTIC_LOCATION"] = l.name
 	hookOptions := ExecuteOptions{
 		Command: "bash",
 		Dir:     cwd,
-		Envs: map[string]string{
-			"AUTORESTIC_LOCATION": l.name,
-		},
+		Envs:    hookEnvs,
 	}
 
 	if err := l.ExecuteHooks(l.ForgetHooks.Before, hookOptions); err != nil {

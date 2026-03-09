@@ -190,6 +190,48 @@ func TestSaveConfigProducesReadableConfig(t *testing.T) {
 	assert.Equal(t, c, *readConfig)
 }
 
+func TestSaveConfigWithEnvsProducesReadableConfig(t *testing.T) {
+	workDir := t.TempDir()
+	viper.SetConfigFile(path.Join(workDir, ".autorestic.yml"))
+
+	// Required to appease the config reader
+	viper.Set("version", 2)
+
+	c := Config{
+		Version: "2",
+		Locations: map[string]Location{
+			"test": {
+				Type: "local",
+				name: "test",
+				From: []string{"in-dir"},
+				To:   []string{"test"},
+				Envs: map[string]string{
+					"HEALTHCHECKS_URL": "https://hc-ping.com/xxxx",
+					"NOTIFY_EMAIL":     "user@example.com",
+				},
+			},
+		},
+		Backends: map[string]Backend{
+			"test": {
+				name: "test",
+				Type: "local",
+				Path: "backup-target",
+				Key:  "supersecret",
+			},
+		},
+	}
+
+	err := c.SaveConfig()
+	assert.NoError(t, err)
+
+	// Ensure we the config reading logic actually runs
+	config = nil
+	once = sync.Once{}
+	readConfig := GetConfig()
+	assert.NotNil(t, readConfig)
+	assert.Equal(t, c, *readConfig)
+}
+
 func assertEqual[T comparable](t testing.TB, result, expected T) {
 	t.Helper()
 

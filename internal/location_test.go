@@ -91,3 +91,24 @@ func TestBuildRestoreCommand(t *testing.T) {
 	expected := []string{"restore", "--target", "to", "--tag", "ar:location:foo", "snapshot", "options"}
 	assertSliceEqual(t, result, expected)
 }
+
+func TestLocationEnvsArePresent(t *testing.T) {
+	t.Run("envs field is populated", func(t *testing.T) {
+		l := Location{
+			name: "foo",
+			Envs: map[string]string{
+				"HEALTHCHECKS_URL": "https://hc-ping.com/xxxx",
+				"NOTIFY_EMAIL":     "user@example.com",
+			},
+		}
+		assertEqual(t, l.Envs["HEALTHCHECKS_URL"], "https://hc-ping.com/xxxx")
+		assertEqual(t, l.Envs["NOTIFY_EMAIL"], "user@example.com")
+	})
+
+	t.Run("envs field is nil when unset", func(t *testing.T) {
+		l := Location{
+			name: "foo",
+		}
+		assertEqual(t, len(l.Envs), 0)
+	})
+}

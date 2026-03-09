@@ -193,13 +193,16 @@ func CheckConfig() error {
 	for name, location := range c.Locations {
 		location.name = name
 
-		// Hooks before location validation
+		// User-defined envs are applied first so system vars always take priority
+		envs := map[string]string{}
+		for k, v := range location.Envs {
+			envs[k] = v
+		}
+		envs["AUTORESTIC_LOCATION"] = location.name
 		options := ExecuteOptions{
 			Command: "bash",
 			Dir:     cwd,
-			Envs: map[string]string{
-				"AUTORESTIC_LOCATION": location.name,
-			},
+			Envs:    envs,
 		}
 		if err := location.ExecuteHooks(location.Hooks.PreValidate, options); err != nil {
 			return err
