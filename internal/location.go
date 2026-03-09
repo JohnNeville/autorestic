@@ -364,7 +364,7 @@ func (l Location) Forget(prune bool, dry bool) error {
 		backendsToForget = append(backendsToForget, copyBackends...)
 	}
 
-	for _, to := range backendsToForget {
+	for i, to := range backendsToForget {
 		backend, _ := GetBackend(to)
 		colors.Secondary.Printf("For backend \"%s\"\n", backend.name)
 		env, err := backend.getEnv()
@@ -383,9 +383,17 @@ func (l Location) Forget(prune bool, dry bool) error {
 			cmd = append(cmd, "--dry-run")
 		}
 		cmd = append(cmd, combineAllOptions("forget", l, backend)...)
-		_, _, err = ExecuteResticCommand(options, cmd...)
+		_, out, err := ExecuteResticCommand(options, cmd...)
 		if err != nil {
 			forgetErr = err
+		} else {
+			// Extract and expose prune stats for hooks on success
+			md := metadata.ExtractMetadataFromForgetLog(out)
+			mdEnv := metadata.MakeEnvFromForgetMetadata(&md)
+			for k, v := range mdEnv {
+				hookOptions.Envs[k+"_"+fmt.Sprint(i)] = v
+				hookOptions.Envs[k+"_"+strings.ToUpper(backend.name)] = v
+			}
 		}
 	}
 
