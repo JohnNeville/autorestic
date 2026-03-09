@@ -96,13 +96,14 @@ func TestLocationEnvsArePresent(t *testing.T) {
 	t.Run("envs field is populated", func(t *testing.T) {
 		l := Location{
 			name: "foo",
-			Envs: map[string]string{
-				"HEALTHCHECKS_URL": "https://hc-ping.com/xxxx",
-				"NOTIFY_EMAIL":     "user@example.com",
+			Envs: []string{
+				"HEALTHCHECKS_URL=https://hc-ping.com/xxxx",
+				"NOTIFY_EMAIL=user@example.com",
 			},
 		}
-		assertEqual(t, l.Envs["HEALTHCHECKS_URL"], "https://hc-ping.com/xxxx")
-		assertEqual(t, l.Envs["NOTIFY_EMAIL"], "user@example.com")
+		envMap := l.parseEnvs()
+		assertEqual(t, envMap["HEALTHCHECKS_URL"], "https://hc-ping.com/xxxx")
+		assertEqual(t, envMap["NOTIFY_EMAIL"], "user@example.com")
 	})
 
 	t.Run("envs field is nil when unset", func(t *testing.T) {
@@ -110,5 +111,21 @@ func TestLocationEnvsArePresent(t *testing.T) {
 			name: "foo",
 		}
 		assertEqual(t, len(l.Envs), 0)
+	})
+
+	t.Run("envs preserves case sensitivity", func(t *testing.T) {
+		l := Location{
+			name: "foo",
+			Envs: []string{
+				"MyVar=value1",
+				"MYVAR=value2",
+				"myvar=value3",
+			},
+		}
+		envMap := l.parseEnvs()
+		assertEqual(t, envMap["MyVar"], "value1")
+		assertEqual(t, envMap["MYVAR"], "value2")
+		assertEqual(t, envMap["myvar"], "value3")
+		assertEqual(t, len(envMap), 3)
 	})
 }

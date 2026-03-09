@@ -194,10 +194,7 @@ func CheckConfig() error {
 		location.name = name
 
 		// User-defined envs are applied first so system vars always take priority
-		envs := map[string]string{}
-		for k, v := range location.Envs {
-			envs[k] = v
-		}
+		envs := location.parseEnvs()
 		envs["AUTORESTIC_LOCATION"] = location.name
 		options := ExecuteOptions{
 			Command: "bash",

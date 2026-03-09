@@ -50,6 +50,29 @@ If either the `prevalidate` or `before` hook encounters errors then the backup a
 
 All hooks are exposed to the `AUTORESTIC_LOCATION` environment variable, which contains the location name.
 
+### Custom Environment Variables
+
+You can also define custom environment variables that will be available to all hooks for a location using the `envs` field. This is useful for passing configuration or secrets to your hook scripts.
+
+The `envs` field accepts a list of strings in `KEY=VALUE` format. This format preserves case sensitivity, unlike YAML maps which are case-insensitive due to Viper limitations.
+
+```yml | .autorestic.yml
+locations:
+  my-location:
+    from: /data
+    to: my-backend
+    envs:
+      - HEALTHCHECKS_URL=https://hc-ping.com/xxxx
+      - NOTIFY_EMAIL=user@example.com
+      - MyCustomVar=SomeValue
+    hooks:
+      success:
+        - 'curl -fsS -m 10 --retry 5 -o /dev/null $HEALTHCHECKS_URL'
+        - 'echo "Backup completed" | mail -s "Backup Success" $NOTIFY_EMAIL'
+```
+
+### Backup Metadata
+
 The `after` and `success` hooks have access to additional information with the following syntax:
 
 ```bash

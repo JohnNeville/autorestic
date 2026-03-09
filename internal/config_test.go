@@ -205,9 +205,9 @@ func TestSaveConfigWithEnvsProducesReadableConfig(t *testing.T) {
 				name: "test",
 				From: []string{"in-dir"},
 				To:   []string{"test"},
-				Envs: map[string]string{
-					"HEALTHCHECKS_URL": "https://hc-ping.com/xxxx",
-					"NOTIFY_EMAIL":     "user@example.com",
+				Envs: []string{
+					"HEALTHCHECKS_URL=https://hc-ping.com/xxxx",
+					"NOTIFY_EMAIL=user@example.com",
 				},
 			},
 		},

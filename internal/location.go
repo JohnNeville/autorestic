@@ -55,13 +55,25 @@ type Location struct {
 	Options      Options              `mapstructure:"options,omitempty" yaml:"options,omitempty"`
 	ForgetOption LocationForgetOption `mapstructure:"forget,omitempty" yaml:"forget,omitempty"`
 	CopyOption   LocationCopy         `mapstructure:"copy,omitempty" yaml:"copy,omitempty"`
-	Envs         map[string]string    `mapstructure:"envs,omitempty" yaml:"envs,omitempty"`
+	Envs         []string             `mapstructure:"envs,omitempty" yaml:"envs,omitempty"`
 }
 
 func GetLocation(name string) (Location, bool) {
 	l, ok := GetConfig().Locations[name]
 	l.name = name
 	return l, ok
+}
+
+// parseEnvs converts the Envs slice (in key=value format) to a map
+func (l Location) parseEnvs() map[string]string {
+	envMap := make(map[string]string)
+	for _, env := range l.Envs {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+	return envMap
 }
 
 func (l Location) validate() error {
@@ -181,10 +193,7 @@ func (l Location) Backup(cron bool, dry bool, specificBackend string) []error {
 	}
 	cwd, _ := GetPathRelativeToConfig(".")
 	// User-defined envs are applied first so system vars always take priority
-	envs := map[string]string{}
-	for k, v := range l.Envs {
-		envs[k] = v
-	}
+	envs := l.parseEnvs()
 	envs["AUTORESTIC_LOCATION"] = l.name
 	options := ExecuteOptions{
 		Command: "bash",
@@ -348,10 +357,7 @@ func (l Location) Forget(prune bool, dry bool) error {
 
 	cwd, _ := GetPathRelativeToConfig(".")
 	// User-defined envs are applied first so system vars always take priority
-	hookEnvs := map[string]string{}
-	for k, v := range l.Envs {
-		hookEnvs[k] = v
-	}
+	hookEnvs := l.parseEnvs()
 	hookEnvs["AUTORESTIC_LOCATION"] = l.name
 	hookOptions := ExecuteOptions{
 		Command: "bash",
