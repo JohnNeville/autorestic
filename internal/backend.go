@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cupcakearmy/autorestic/internal/colors"
-	"github.com/cupcakearmy/autorestic/internal/flags"
+	"github.com/JohnNeville/autorestic/internal/colors"
+	"github.com/JohnNeville/autorestic/internal/flags"
 )
 
 type BackendRest struct {

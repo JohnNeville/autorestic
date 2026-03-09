@@ -13,7 +13,7 @@ elif [[ $NATIVE_OS == *"darwin"* ]]; then
 elif [[ $NATIVE_OS == *"freebsd"* ]]; then
     OS=freebsd
 else
-    echo "Could not determine OS automatically, please check the release page manually: https://github.com/cupcakearmy/autorestic/releases"
+    echo "Could not determine OS automatically, please check the release page manually: https://github.com/JohnNeville/autorestic/releases"
     exit 1
 fi
 echo $OS
@@ -28,7 +28,7 @@ elif [[ $NATIVE_ARCH == *"x86"* ]]; then
 elif [[ $NATIVE_ARCH == *"armv7"* ]]; then
     ARCH=arm
 else
-    echo "Could not determine Architecure automatically, please check the release page manually: https://github.com/cupcakearmy/autorestic/releases"
+    echo "Could not determine Architecure automatically, please check the release page manually: https://github.com/JohnNeville/autorestic/releases"
     exit 1
 fi
 echo $ARCH
