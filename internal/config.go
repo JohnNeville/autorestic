@@ -129,6 +129,9 @@ func (c *Config) Describe() {
 		if l.Cron != "" {
 			colors.PrintDescription("Cron", l.Cron)
 		}
+		if l.VerifyCron != "" {
+			colors.PrintDescription("Verify", l.VerifyCron)
+		}
 
 		tmp = ""
 		hooks := map[string][]string{

@@ -51,7 +51,9 @@ type Location struct {
 	To           []string             `mapstructure:"to,omitempty" yaml:"to,omitempty"`
 	Hooks        Hooks                `mapstructure:"hooks,omitempty" yaml:"hooks,omitempty"`
 	ForgetHooks  Hooks                `mapstructure:"forget-hooks,omitempty" yaml:"forget-hooks,omitempty"`
+	VerifyHooks  Hooks                `mapstructure:"verify-hooks,omitempty" yaml:"verify-hooks,omitempty"`
 	Cron         string               `mapstructure:"cron,omitempty" yaml:"cron,omitempty"`
+	VerifyCron   string               `mapstructure:"verify-cron,omitempty" yaml:"verify-cron,omitempty"`
 	Options      Options              `mapstructure:"options,omitempty" yaml:"options,omitempty"`
 	ForgetOption LocationForgetOption `mapstructure:"forget,omitempty" yaml:"forget,omitempty"`
 	CopyOption   LocationCopy         `mapstructure:"copy,omitempty" yaml:"copy,omitempty"`
@@ -435,6 +437,71 @@ func (l Location) Forget(prune bool, dry bool) error {
 	return nil
 }
 
+// Verify runs "restic check" against every backend the location writes to,
+// including copy targets. Flags come from the "check" options key.
+func (l Location) Verify() error {
+	colors.PrimaryPrint("Verifying for location \"%s\"", l.name)
+
+	cwd, _ := GetPathRelativeToConfig(".")
+	// User-defined envs are applied first so system vars always take priority
+	hookEnvs := l.parseEnvs()
+	hookEnvs["AUTORESTIC_LOCATION"] = l.name
+	hookOptions := ExecuteOptions{
+		Command: "bash",
+		Dir:     cwd,
+		Envs:    hookEnvs,
+	}
+
+	if err := l.ExecuteHooks(l.VerifyHooks.Before, hookOptions); err != nil {
+		hookOptions.Envs["AUTORESTIC_FAILURE_REASON"] = err.Error()
+		if hookErr := l.ExecuteHooks(l.VerifyHooks.Failure, hookOptions); hookErr != nil {
+			colors.Error.Println(hookErr)
+		}
+		return err
+	}
+
+	backendsToVerify := append([]string{}, l.To...)
+	for _, copyBackends := range l.CopyOption {
+		backendsToVerify = append(backendsToVerify, copyBackends...)
+	}
+
+	var verifyErrs []error
+	for _, to := range backendsToVerify {
+		backend, _ := GetBackend(to)
+		colors.Secondary.Printf("For backend \"%s\"\n", backend.name)
+		env, err := backend.getEnv()
+		if err != nil {
+			verifyErrs = append(verifyErrs, fmt.Errorf("%s@%s: %w", l.name, backend.name, err))
+			continue
+		}
+		cmd := append([]string{"check"}, combineAllOptions("check", l, backend)...)
+		_, out, err := ExecuteResticCommand(ExecuteOptions{Envs: env}, cmd...)
+		if err != nil {
+			verifyErrs = append(verifyErrs, fmt.Errorf("%s@%s:\n%s%s", l.name, backend.name, out, err))
+		}
+	}
+
+	if err := l.ExecuteHooks(l.VerifyHooks.After, hookOptions); err != nil {
+		verifyErrs = append(verifyErrs, err)
+	}
+
+	if len(verifyErrs) > 0 {
+		verifyErr := errors.Join(verifyErrs...)
+		hookOptions.Envs["AUTORESTIC_FAILURE_REASON"] = verifyErr.Error()
+		if err := l.ExecuteHooks(l.VerifyHooks.Failure, hookOptions); err != nil {
+			colors.Error.Println(err)
+		}
+		return verifyErr
+	}
+
+	if err := l.ExecuteHooks(l.VerifyHooks.Success, hookOptions); err != nil {
+		return err
+	}
+
+	colors.Success.Println("Done")
+	return nil
+}
+
 func (l Location) hasBackend(backend string) bool {
 	for _, b := range l.To {
 		if b == backend {
@@ -505,27 +572,56 @@ func (l Location) Restore(to, from string, force bool, snapshot string, options 
 }
 
 func (l Location) RunCron() error {
-	if l.Cron == "" {
-		return nil
-	}
+	var errs []error
 
-	schedule, err := cron.ParseStandard(l.Cron)
-	if err != nil {
-		return err
-	}
-	last := time.Unix(lock.GetCron(l.name), 0)
-	next := schedule.Next(last)
-	now := time.Now()
-	if now.After(next) {
-		lock.SetCron(l.name, now.Unix())
-		errs := l.Backup(true, false, "")
-		if len(errs) > 0 {
-			return fmt.Errorf("Failed to backup location \"%s\":\n%w", l.name, errors.Join(errs...))
+	if l.Cron != "" {
+		due, err := isDue(l.Cron, lock.GetCron(l.name))
+		if err != nil {
+			return err
 		}
-	} else {
-		if !flags.CRON_LEAN {
+		if due {
+			lock.SetCron(l.name, time.Now().Unix())
+			if backupErrs := l.Backup(true, false, ""); len(backupErrs) > 0 {
+				errs = append(errs, fmt.Errorf("Failed to backup location \"%s\":\n%w", l.name, errors.Join(backupErrs...)))
+			}
+		} else if !flags.CRON_LEAN {
 			colors.Body.Printf("Skipping \"%s\", not due yet.\n", l.name)
 		}
 	}
-	return nil
+
+	if l.VerifyCron != "" {
+		last := lock.GetVerifyCron(l.name)
+		if last == 0 {
+			// First sighting: start the schedule now instead of running a
+			// potentially hours-long check on the very next cron tick.
+			lock.SetVerifyCron(l.name, time.Now().Unix())
+			if !flags.CRON_LEAN {
+				colors.Body.Printf("Scheduling verify of \"%s\" from now on.\n", l.name)
+			}
+			return errors.Join(errs...)
+		}
+		due, err := isDue(l.VerifyCron, last)
+		if err != nil {
+			return err
+		}
+		if due {
+			lock.SetVerifyCron(l.name, time.Now().Unix())
+			if err := l.Verify(); err != nil {
+				errs = append(errs, fmt.Errorf("Failed to verify location \"%s\":\n%w", l.name, err))
+			}
+		} else if !flags.CRON_LEAN {
+			colors.Body.Printf("Skipping verify of \"%s\", not due yet.\n", l.name)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// isDue reports whether a cron expression has fired since the unix time last.
+func isDue(expr string, last int64) (bool, error) {
+	schedule, err := cron.ParseStandard(expr)
+	if err != nil {
+		return false, err
+	}
+	return time.Now().After(schedule.Next(time.Unix(last, 0))), nil
 }

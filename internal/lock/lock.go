@@ -67,6 +67,14 @@ func SetCron(location string, value int64) {
 	setLockValue("cron."+location, value)
 }
 
+func GetVerifyCron(location string) int64 {
+	return getLock().GetInt64("verify." + location)
+}
+
+func SetVerifyCron(location string, value int64) {
+	setLockValue("verify."+location, value)
+}
+
 func Lock() error {
 	_, err := setLockValue(RUNNING, true)
 	return err
