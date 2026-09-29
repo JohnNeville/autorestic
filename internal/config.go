@@ -159,7 +159,7 @@ func (c *Config) Describe() {
 				tmp += "\n\t" + t
 				for option, values := range options {
 					for _, value := range values {
-						tmp += colors.Faint.Sprintf("\n\t  ✧ --%s=%s", option, value)
+						tmp += colors.Faint.Sprintf("\n\t  ✧ --%s=%v", option, value)
 					}
 				}
 			}
