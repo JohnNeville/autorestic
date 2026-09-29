@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const VERSION = "1.8.3"
+const VERSION = "1.8.5-paulrevere-verify"
 
 type OptionMap map[string][]interface{}
 type Options map[string]OptionMap
