@@ -1,5 +1,23 @@
 # Unlock
 
+## Stale locks are cleared automatically
+
+The lock file (`.autorestic.lock.yml`, next to the config) records which process holds it: its PID, hostname and, on Linux, the boot ID and the process start time. When a new run finds the lock held, it takes the lock over with a message like
+
+```
+removing stale lock (pid 4242 on myhost, locked 2026-09-29T21:27:21-04:00): process 4242 no longer exists
+```
+
+if it can prove the owner is gone: the system has rebooted since the lock was taken, the PID no longer exists, or the PID now belongs to a different process. Otherwise it exits with `an instance is already running (pid … on …). exiting`.
+
+A lock is never cleared automatically when that can't be proven: if it was written by an older autorestic (no owner recorded), or taken on a different host (for example a config on shared storage). Those still need `autorestic unlock`.
+
+Only the process holding the lock releases it on exit, so an autorestic command that fails while another instance is running no longer clears that instance's lock.
+
+This only covers autorestic's own lock. A restic repository lock left by a killed `restic` process is separate; see [Unlock a locked repository](/examples#unlock-a-locked-repository).
+
+## Manual unlock
+
 In case autorestic throws the error message `an instance is already running. exiting`, but there is no instance running you can unlock the lock.
 
 To verify that there is no instance running you can use `ps aux | grep autorestic`.

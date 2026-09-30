@@ -33,7 +33,7 @@ To check you can run "ps aux | grep autorestic".`,
 			}
 		}
 
-		err := lock.Unlock()
+		err := lock.ForceUnlock()
 		if err != nil {
 			colors.Error.Println("Could not unlock:", err)
 			return

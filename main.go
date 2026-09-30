@@ -26,8 +26,10 @@ import (
 )
 
 func handleCtrlC() {
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	// Buffered so a signal arriving before the goroutine is ready is not dropped;
+	// SIGHUP covers the terminal being closed mid-run.
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	go func() {
 		sig := <-c
 		fmt.Println("Signal:", sig)
