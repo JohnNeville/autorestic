@@ -74,6 +74,11 @@ func staleReason(o Owner) string {
 	return ""
 }
 
+// ProcessExists reports whether a process with this PID exists on this host.
+func ProcessExists(pid int) bool {
+	return processExists(pid)
+}
+
 func defaultProcessExists(pid int) bool {
 	err := syscall.Kill(pid, 0)
 	// EPERM: the process exists but belongs to another user.
