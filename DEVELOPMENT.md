@@ -31,10 +31,24 @@ Releases are automatically built by the github workflow and uploaded to the rele
 
 ## John's fork
 
-`johnn` is the branch that gets built and deployed. It is upstream `master` plus
-every fork change; feature branches are merged into it and then deleted. Keep
-the `-johnn` suffix on `VERSION` in `internal/config.go`, and bump it with each
-change that gets deployed.
+`johnn` is the stable personal branch: upstream `master` plus every fork change,
+and the only branch that gets built and deployed. Only tested work is merged
+into it, so it should always be deployable.
+
+Changes go through a short-lived feature branch:
+
+```bash
+git switch johnn && git pull
+git switch -c feature/<name>          # work, commit, build/johnn-build.sh
+git push -u origin feature/<name>     # CI runs on feature/** too
+git switch johnn
+git merge --no-ff feature/<name>      # one merge commit per feature
+git push
+git branch -d feature/<name> && git push origin --delete feature/<name>
+```
+
+Keep the `-johnn` suffix on `VERSION` in `internal/config.go`, and bump it in
+the feature branch for each change that gets deployed.
 
 Build and install (Go runs in Docker, so no local Go is needed):
 
