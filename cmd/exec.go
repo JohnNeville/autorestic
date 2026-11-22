@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/JohnNeville/autorestic/internal"
 	"github.com/JohnNeville/autorestic/internal/colors"
 	"github.com/JohnNeville/autorestic/internal/lock"
@@ -31,13 +29,7 @@ var execCmd = &cobra.Command{
 			}
 		}
 
-		if len(errors) > 0 {
-			for _, err := range errors {
-				colors.Error.Printf("%s\n\n", err)
-			}
-
-			CheckErr(fmt.Errorf("%d errors were found", len(errors)))
-		}
+		CheckErr(errorsFound(errors))
 	},
 }
 

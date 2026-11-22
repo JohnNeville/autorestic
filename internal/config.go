@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const VERSION = "1.8.7-johnn"
+const VERSION = "1.8.8-johnn"
 
 // Commit is the git commit this binary was built from, set at link time by
 // build/johnn-build.sh (-ldflags "-X .../internal.Commit=..."). Empty for
