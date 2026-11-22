@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +29,16 @@ func CheckErr(err error) {
 		lock.Unlock()
 		os.Exit(1)
 	}
+}
+
+// errorsFound combines the errors of a multi-location or multi-backend command
+// into one, so the final "Error: ..." (and its journal entry in CI mode) says
+// what failed, not just how many things did. nil if there were none.
+func errorsFound(errs []error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%d errors were found:\n%w", len(errs), errors.Join(errs...))
 }
 
 var cfgFile string

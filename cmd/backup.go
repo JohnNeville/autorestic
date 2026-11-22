@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/JohnNeville/autorestic/internal"
-	"github.com/JohnNeville/autorestic/internal/colors"
 	"github.com/JohnNeville/autorestic/internal/lock"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +21,7 @@ var backupCmd = &cobra.Command{
 		selected, err := internal.GetAllOrSelected(cmd, false)
 		CheckErr(err)
 
-		errors := 0
+		var errs []error
 		for _, name := range selected {
 			var splitted = strings.Split(name, "@")
 			var specificBackend = ""
@@ -31,15 +29,9 @@ var backupCmd = &cobra.Command{
 				specificBackend = splitted[1]
 			}
 			location, _ := internal.GetLocation(splitted[0])
-			errs := location.Backup(false, dry, specificBackend)
-			for _, err := range errs {
-				colors.Error.Printf("%s\n\n", err)
-				errors++
-			}
+			errs = append(errs, location.Backup(false, dry, specificBackend)...)
 		}
-		if errors > 0 {
-			CheckErr(fmt.Errorf("%d errors were found", errors))
-		}
+		CheckErr(errorsFound(errs))
 	},
 }
 
