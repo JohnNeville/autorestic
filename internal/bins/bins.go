@@ -12,10 +12,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/blang/semver/v4"
 	"github.com/JohnNeville/autorestic/internal"
 	"github.com/JohnNeville/autorestic/internal/colors"
 	"github.com/JohnNeville/autorestic/internal/flags"
+	"github.com/blang/semver/v4"
 )
 
 const INSTALL_PATH = "/usr/local/bin"
