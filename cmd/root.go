@@ -8,6 +8,7 @@ import (
 	"github.com/JohnNeville/autorestic/internal"
 	"github.com/JohnNeville/autorestic/internal/colors"
 	"github.com/JohnNeville/autorestic/internal/flags"
+	"github.com/JohnNeville/autorestic/internal/journal"
 	"github.com/JohnNeville/autorestic/internal/lock"
 	"github.com/spf13/cobra"
 
@@ -17,7 +18,12 @@ import (
 
 func CheckErr(err error) {
 	if err != nil {
-		colors.Error.Fprintln(os.Stderr, "Error:", err)
+		// CI mode: record the failure in the systemd journal even when stdout
+		// and stderr go to a log file (see internal.Announce).
+		sent := flags.CI && journal.Send("Error: "+err.Error(), journal.Err, nil) == nil
+		if !sent || !journal.IsJournalStream(2) {
+			colors.Error.Fprintln(os.Stderr, "Error:", err)
+		}
 		lock.Unlock()
 		os.Exit(1)
 	}
@@ -38,7 +44,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.autorestic.yml or ./.autorestic.yml)")
-	rootCmd.PersistentFlags().BoolVar(&flags.CI, "ci", false, "CI mode disabled interactive mode and colors and enables verbosity")
+	rootCmd.PersistentFlags().BoolVar(&flags.CI, "ci", false, "CI mode disables interactive mode and colors, enables verbosity, and sends errors and lock events to the systemd journal")
 	rootCmd.PersistentFlags().BoolVarP(&flags.VERBOSE, "verbose", "v", false, "verbose mode")
 	rootCmd.PersistentFlags().StringVar(&flags.RESTIC_BIN, "restic-bin", "restic", "specify custom restic binary")
 	rootCmd.PersistentFlags().StringVar(&flags.DOCKER_IMAGE, "docker-image", "cupcakearmy/autorestic:"+internal.VERSION, "specify a custom docker image")

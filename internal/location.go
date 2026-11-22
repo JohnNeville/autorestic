@@ -250,7 +250,8 @@ func (l Location) Backup(cron bool, dry bool, specificBackend string) []error {
 		}
 		cmd = append(cmd, "--tag", l.getLocationTags())
 		backupOptions := ExecuteOptions{
-			Envs: env,
+			Envs:    env,
+			Backend: backend.name,
 		}
 
 		var code int = 0
@@ -306,7 +307,8 @@ func (l Location) Backup(cron bool, dry bool, specificBackend string) []error {
 						env[k+"2"] = v
 					}
 					_, _, err := ExecuteResticCommand(ExecuteOptions{
-						Envs: env,
+						Envs:    env,
+						Backend: copyToTarget,
 					}, "copy", md.SnapshotID)
 
 					if err != nil {
@@ -390,7 +392,8 @@ func (l Location) Forget(prune bool, dry bool) error {
 			continue
 		}
 		options := ExecuteOptions{
-			Envs: env,
+			Envs:    env,
+			Backend: backend.name,
 		}
 		cmd := []string{"forget", "--tag", l.getLocationTags()}
 		if prune {
@@ -475,7 +478,7 @@ func (l Location) Verify() error {
 			continue
 		}
 		cmd := append([]string{"check"}, combineAllOptions("check", l, backend)...)
-		_, out, err := ExecuteResticCommand(ExecuteOptions{Envs: env}, cmd...)
+		_, out, err := ExecuteResticCommand(ExecuteOptions{Envs: env, Backend: backend.name}, cmd...)
 		if err != nil {
 			verifyErrs = append(verifyErrs, fmt.Errorf("%s@%s:\n%s%s", l.name, backend.name, out, err))
 		}

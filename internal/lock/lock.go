@@ -1,12 +1,14 @@
 package lock
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"sync"
 
 	"github.com/JohnNeville/autorestic/internal/colors"
 	"github.com/JohnNeville/autorestic/internal/flags"
+	"github.com/JohnNeville/autorestic/internal/journal"
 	"github.com/spf13/viper"
 )
 
@@ -57,14 +59,17 @@ func setLockValue(key string, value interface{}) (*viper.Viper, error) {
 			owner := getOwner()
 			reason := staleReason(owner)
 			if reason == "" {
+				msg := "an instance is already running. exiting"
 				if owner.PID > 0 {
-					colors.Error.Printf("an instance is already running (%s). exiting\n", owner)
-				} else {
-					colors.Error.Println("an instance is already running. exiting")
+					msg = fmt.Sprintf("an instance is already running (%s). exiting", owner)
 				}
+				colors.Error.Println(msg)
+				toJournal(journal.Warning, msg)
 				os.Exit(1)
 			}
-			colors.Secondary.Printf("removing stale lock (%s): %s\n", owner, reason)
+			msg := fmt.Sprintf("removing stale lock (%s): %s", owner, reason)
+			colors.Secondary.Println(msg)
+			toJournal(journal.Notice, msg)
 		}
 		if value {
 			setOwner(currentOwner())
@@ -148,4 +153,12 @@ func Unlock() error {
 func ForceUnlock() error {
 	_, err := setLockValue(RUNNING, false)
 	return err
+}
+
+// toJournal also records a lock event in the systemd journal in CI mode, where
+// stdout usually goes to a log file (see internal.Announce).
+func toJournal(priority journal.Priority, msg string) {
+	if flags.CI && !journal.IsJournalStream(1) {
+		journal.Send(msg, priority, nil)
+	}
 }

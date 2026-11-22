@@ -92,3 +92,19 @@ func TestDefaultProcessExists(t *testing.T) {
 		t.Errorf("reaped child %d reported as existing", cmd.Process.Pid)
 	}
 }
+
+func TestBootTime(t *testing.T) {
+	root := t.TempDir()
+	old := procRoot
+	procRoot = root
+	defer func() { procRoot = old }()
+
+	if _, ok := BootTime(); ok {
+		t.Error("BootTime without /proc/stat should fail")
+	}
+	os.WriteFile(filepath.Join(root, "stat"), []byte("cpu  1 2 3\nintr 5\nbtime 1795323397\nprocesses 9\n"), 0o644)
+	bt, ok := BootTime()
+	if !ok || bt.Unix() != 1795323397 {
+		t.Errorf("got %v %v", bt, ok)
+	}
+}

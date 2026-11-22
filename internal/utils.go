@@ -8,9 +8,12 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/JohnNeville/autorestic/internal/colors"
 	"github.com/JohnNeville/autorestic/internal/flags"
+	"github.com/JohnNeville/autorestic/internal/journal"
 	"github.com/JohnNeville/autorestic/internal/lock"
 	"github.com/fatih/color"
 )
@@ -29,6 +32,7 @@ type ExecuteOptions struct {
 	Envs    map[string]string
 	Dir     string
 	Silent  bool
+	Backend string // backend name, for messages about it
 }
 
 type ColoredWriter struct {
@@ -83,43 +87,131 @@ func ExecuteResticCommand(options ExecuteOptions, args ...string) (int, string, 
 	options.Command = flags.RESTIC_BIN
 	var c = GetConfig()
 	var optionsAsString = getOptions(c.Global, []string{"all"})
-	code, out, err := ExecuteCommand(options, append(optionsAsString, args...)...)
-	if err != nil && clearStaleResticLock(options, optionsAsString, out) {
-		return ExecuteCommand(options, append(optionsAsString, args...)...)
+	full := append(append([]string{}, optionsAsString...), args...)
+	code, out, err := ExecuteCommand(options, full...)
+	if err == nil {
+		return code, out, err
 	}
+	l, locked := parseResticLock(out)
+	if !locked {
+		return code, out, err
+	}
+
+	subcommand := ""
+	if len(args) > 0 {
+		subcommand = args[0]
+	}
+	fields := map[string]string{
+		"AUTORESTIC_BACKEND": options.Backend,
+		"RESTIC_COMMAND":     subcommand,
+		"RESTIC_LOCK_PID":    strconv.Itoa(l.PID),
+		"RESTIC_LOCK_HOST":   l.Host,
+	}
+	where := "restic repository"
+	hint := "restic unlock"
+	if options.Backend != "" {
+		where = fmt.Sprintf("backend \"%s\"", options.Backend)
+		hint = fmt.Sprintf("autorestic exec -b %s unlock", options.Backend)
+	}
+
+	var kept string
+	if reason := staleResticLockReason(l); reason == "" {
+		kept = keptResticLockReason(l)
+	} else {
+		Announce(journal.Notice, fields, "%s: removing stale restic lock held by %s (%s)", where, l, reason)
+		_, unlockOut, uerr := ExecuteCommand(options, append(append([]string{}, optionsAsString...), "unlock")...)
+		if uerr != nil {
+			kept = fmt.Sprintf("restic unlock failed: %s%s", strings.TrimSpace(unlockOut), uerr)
+		} else {
+			code, out, err = ExecuteCommand(options, full...)
+			if err == nil {
+				return code, out, err
+			}
+			l2, still := parseResticLock(out)
+			if !still {
+				return code, out, err
+			}
+			l = l2
+			kept = "still locked after restic unlock"
+		}
+	}
+
+	Announce(journal.Err, fields, "%s: restic %s failed: repository is locked by %s; not removed: %s. If no restic process is using the repository, clear it with: %s",
+		where, subcommand, l, kept, hint)
 	return code, out, err
+}
+
+// resticLock is the lock holder restic reports when a command can't lock the
+// repository.
+type resticLock struct {
+	PID     int
+	Host    string
+	Created time.Time // zero if restic didn't say
+}
+
+func (l resticLock) String() string {
+	s := fmt.Sprintf("PID %d on %s", l.PID, l.Host)
+	if !l.Created.IsZero() {
+		s += ", created " + l.Created.Format("2006-01-02 15:04:05")
+	}
+	return s
 }
 
 // e.g. "repository is already locked exclusively by PID 3841541 on paulrevere by root (UID 0, GID 0)"
 var resticLockedRe = regexp.MustCompile(`repository is already locked (?:exclusively )?by PID (\d+) on (\S+) by `)
 
-// clearStaleResticLock handles a restic command that failed on a repository
-// lock left behind by a restic process on this host that no longer exists
-// (killed, crashed, or interrupted by a reboot). It runs "restic unlock", which
-// only removes locks restic itself considers stale, and reports whether the
-// failed command should be retried. Locks from other hosts or from a live
-// process are left alone.
-func clearStaleResticLock(options ExecuteOptions, globalOptions []string, out string) bool {
+// e.g. "lock was created at 2026-11-16 21:24:06 (122h41m50s ago)", in local time.
+var resticLockCreatedRe = regexp.MustCompile(`lock was created at (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})`)
+
+func parseResticLock(out string) (resticLock, bool) {
 	m := resticLockedRe.FindStringSubmatch(out)
 	if m == nil {
-		return false
+		return resticLock{}, false
 	}
 	pid, err := strconv.Atoi(m[1])
 	if err != nil || pid <= 0 {
-		return false
+		return resticLock{}, false
 	}
-	host, _ := os.Hostname()
-	if host == "" || m[2] != host || lock.ProcessExists(pid) {
-		return false
+	l := resticLock{PID: pid, Host: m[2]}
+	if c := resticLockCreatedRe.FindStringSubmatch(out); c != nil {
+		if t, err := time.ParseInLocation("2006-01-02 15:04:05", c[1], time.Local); err == nil {
+			l.Created = t
+		}
 	}
+	return l, true
+}
 
-	colors.Secondary.Printf("Removing stale restic lock held by PID %d on %s (process no longer exists)\n", pid, host)
-	_, unlockOut, err := ExecuteCommand(options, append(globalOptions, "unlock")...)
-	if err != nil {
-		colors.Error.Printf("restic unlock failed: %s%s\n", unlockOut, err)
-		return false
+// Seams for tests.
+var (
+	osHostname    = os.Hostname
+	processExists = lock.ProcessExists
+	bootTime      = lock.BootTime
+)
+
+// staleResticLockReason returns why a lock held by a restic process on this
+// host can no longer be in use, or "" if it may be. Locks from other hosts are
+// never considered stale: their processes can't be checked from here.
+func staleResticLockReason(l resticLock) string {
+	host, _ := osHostname()
+	if host == "" || l.Host != host {
+		return ""
 	}
-	return true
+	// Checked first: after a reboot the PID may belong to an unrelated process.
+	if bt, ok := bootTime(); ok && !l.Created.IsZero() && l.Created.Before(bt) {
+		return "created before this host last booted"
+	}
+	if !processExists(l.PID) {
+		return fmt.Sprintf("process %d no longer exists", l.PID)
+	}
+	return ""
+}
+
+func keptResticLockReason(l resticLock) string {
+	host, _ := osHostname()
+	if host == "" || l.Host != host {
+		return "it is held by another host"
+	}
+	return fmt.Sprintf("process %d is still running", l.PID)
 }
 
 func CopyFile(from, to string) error {

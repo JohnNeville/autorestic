@@ -129,7 +129,7 @@ func (b Backend) validate() error {
 	if err != nil {
 		return err
 	}
-	options := ExecuteOptions{Envs: env, Silent: true}
+	options := ExecuteOptions{Envs: env, Silent: true, Backend: b.name}
 	// Check if already initialized
 	cmd := []string{"check"}
 	cmd = append(cmd, combineBackendOptions("check", b)...)
@@ -151,7 +151,7 @@ func (b Backend) Exec(args []string) error {
 	if err != nil {
 		return err
 	}
-	options := ExecuteOptions{Envs: env}
+	options := ExecuteOptions{Envs: env, Backend: b.name}
 	args = append(args, combineBackendOptions("exec", b)...)
 	_, out, err := ExecuteResticCommand(options, args...)
 	if err != nil {

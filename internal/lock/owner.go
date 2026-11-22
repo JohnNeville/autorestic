@@ -79,6 +79,22 @@ func ProcessExists(pid int) bool {
 	return processExists(pid)
 }
 
+// BootTime returns when this host last booted (Linux: btime in /proc/stat).
+func BootTime() (time.Time, bool) {
+	b, err := os.ReadFile(procRoot + "/stat")
+	if err != nil {
+		return time.Time{}, false
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if f := strings.Fields(line); len(f) == 2 && f[0] == "btime" {
+			if secs, err := strconv.ParseInt(f[1], 10, 64); err == nil && secs > 0 {
+				return time.Unix(secs, 0), true
+			}
+		}
+	}
+	return time.Time{}, false
+}
+
 func defaultProcessExists(pid int) bool {
 	err := syscall.Kill(pid, 0)
 	// EPERM: the process exists but belongs to another user.
