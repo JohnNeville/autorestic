@@ -32,7 +32,7 @@ func CheckErr(err error) {
 var cfgFile string
 
 var rootCmd = &cobra.Command{
-	Version: internal.VERSION,
+	Version: internal.FullVersion(),
 	Use:     "autorestic",
 	Short:   "CLI Wrapper for restic",
 	Long:    "Documentation:\thttps://autorestic.vercel.app\nSupport:\thttps://discord.gg/wS7RpYTYd2",

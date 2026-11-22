@@ -19,6 +19,20 @@ import (
 
 const VERSION = "1.8.7-johnn"
 
+// Commit is the git commit this binary was built from, set at link time by
+// build/johnn-build.sh (-ldflags "-X .../internal.Commit=..."). Empty for
+// plain "go build".
+var Commit = ""
+
+// FullVersion is VERSION plus the build commit when known, e.g.
+// "1.8.7-johnn+76884bf6a1b2", so two builds of the same version can be told apart.
+func FullVersion() string {
+	if Commit == "" {
+		return VERSION
+	}
+	return VERSION + "+" + Commit
+}
+
 type OptionMap map[string][]interface{}
 type Options map[string]OptionMap
 
